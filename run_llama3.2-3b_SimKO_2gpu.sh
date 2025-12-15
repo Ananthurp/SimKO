@@ -22,9 +22,9 @@ python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_files="$train_files" \
     data.val_files="$test_files" \
-    data.train_batch_size=512 \
+    data.train_batch_size=256 \
     data.max_prompt_length=1024 \
-    data.max_response_length=3072 \
+    data.max_response_length=2048 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     actor_rollout_ref.model.path=$model_name \
@@ -37,10 +37,10 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.model.use_remove_padding=False \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
-    actor_rollout_ref.actor.ppo_max_token_len_per_gpu=12000 \
-    actor_rollout_ref.rollout.log_prob_max_token_len_per_gpu=12000 \
-    actor_rollout_ref.ref.log_prob_max_token_len_per_gpu=12000 \
-    actor_rollout_ref.actor.ppo_mini_batch_size=128 \
+    actor_rollout_ref.actor.ppo_max_token_len_per_gpu=6000 \
+    actor_rollout_ref.rollout.log_prob_max_token_len_per_gpu=6000 \
+    actor_rollout_ref.ref.log_prob_max_token_len_per_gpu=6000 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=64 \
     actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.fsdp_config.param_offload=True \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
@@ -48,7 +48,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.free_cache_engine=False \
     actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
     actor_rollout_ref.rollout.name=vllm \
-    actor_rollout_ref.rollout.gpu_memory_utilization=0.75 \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.60 \
     actor_rollout_ref.rollout.n=8 \
     actor_rollout_ref.ref.fsdp_config.param_offload=True \
     trainer.experiment_name="MATH-Llama-3.2-3B-SimKO-2GPU-Blackwell" \
@@ -66,8 +66,12 @@ python3 -m verl.trainer.main_ppo \
 # Key Changes for 2-GPU Blackwell Setup:
 # 1. CUDA_VISIBLE_DEVICES=0,1 - Use only GPU 0 and GPU 1
 # 2. trainer.n_gpus_per_node=2 - Changed from 8 to 2
-# 3. data.train_batch_size=512 - Reduced from 1024 (adjusted for 2 GPUs)
-# 4. actor.ppo_mini_batch_size=128 - Reduced from 256 (adjusted for 2 GPUs)
-# 5. rollout.enforce_eager=True - CRITICAL: Disable flash attention (not compatible with Blackwell)
-# 6. rollout.gpu_memory_utilization=0.75 - Increased from 0.7 (you have 98GB VRAM)
-# 7. trainer.experiment_name and project_name updated to reflect 2-GPU Blackwell config
+# 3. data.train_batch_size=256 - Reduced from 1024 (adjusted for 2 GPUs and memory)
+# 4. data.max_response_length=2048 - Reduced from 3072 (memory optimization)
+# 5. actor.ppo_mini_batch_size=64 - Reduced from 256 (adjusted for 2 GPUs and memory)
+# 6. actor.ppo_max_token_len_per_gpu=6000 - Reduced from 12000 (memory optimization)
+# 7. rollout.log_prob_max_token_len_per_gpu=6000 - Reduced from 12000 (memory optimization)
+# 8. ref.log_prob_max_token_len_per_gpu=6000 - Reduced from 12000 (memory optimization)
+# 9. rollout.enforce_eager=True - CRITICAL: Disable flash attention (not compatible with Blackwell)
+# 10. rollout.gpu_memory_utilization=0.60 - Reduced from 0.75 (vLLM memory allocation)
+# 11. trainer.experiment_name and project_name updated to reflect 2-GPU Blackwell config

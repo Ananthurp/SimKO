@@ -34,6 +34,39 @@ logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv('VERL_PPO_LOGGING_LEVEL', 'WARN'))
 
 
+def get_vllm_tensor_parallel_group():
+    """Get vLLM tensor parallel group with compatibility for different vLLM versions.
+
+    Newer vLLM versions (>= 0.7.0) changed the parallel_state API.
+    This function tries multiple approaches to get the correct group.
+    """
+    # Try newer API first (vLLM >= 0.7.0)
+    try:
+        if hasattr(vllm_ps, 'get_tp_group'):
+            group = vllm_ps.get_tp_group()
+            # Newer versions return a GroupCoordinator, need device_group
+            if hasattr(group, 'device_group'):
+                return group.device_group
+            return group
+    except (AttributeError, RuntimeError):
+        pass
+
+    # Try older API (vLLM <= 0.6.3)
+    try:
+        if hasattr(vllm_ps, 'get_tensor_model_parallel_group'):
+            group = vllm_ps.get_tensor_model_parallel_group()
+            # Check if it has device_group attribute (vLLM 0.6.6+)
+            if hasattr(group, 'device_group'):
+                return group.device_group
+            return group
+    except (AttributeError, RuntimeError):
+        pass
+
+    # Fallback: return None (will use default comm group)
+    logger.warning("Could not get vLLM tensor parallel group, using default torch.distributed group")
+    return None
+
+
 class FSDPVLLMShardingManager(BaseShardingManager):
 
     def __init__(self,
@@ -130,10 +163,7 @@ class FSDPVLLMShardingManager(BaseShardingManager):
     def preprocess_data(self, data: DataProto) -> DataProto:
         # TODO: Current impl doesn't consider FSDP with torch micro-dp
         tp_size = vllm_ps.get_tensor_model_parallel_world_size()
-        if vllm_version in ('0.3.1', '0.4.2', '0.5.4', '0.6.3'):
-            group = vllm_ps.get_tensor_model_parallel_group()
-        else:
-            group = vllm_ps.get_tensor_model_parallel_group().device_group
+        group = get_vllm_tensor_parallel_group()
 
         all_gather_data_proto(data=data, process_group=group)
         return data
@@ -142,12 +172,9 @@ class FSDPVLLMShardingManager(BaseShardingManager):
         # TODO: Current impl doesn't consider FSDP with torch micro-dp
         local_world_size = vllm_ps.get_tensor_model_parallel_world_size()
         src_rank = (torch.distributed.get_rank() // local_world_size) * local_world_size
-        if vllm_version in ('0.3.1', '0.4.2', '0.5.4', '0.6.3'):
-            broadcast_dict_tensor(data.batch, src=src_rank, group=vllm_ps.get_tensor_model_parallel_group())
-        else:
-            broadcast_dict_tensor(data.batch,
-                                  src=src_rank,
-                                  group=vllm_ps.get_tensor_model_parallel_group().device_group)
+        group = get_vllm_tensor_parallel_group()
+        broadcast_dict_tensor(data.batch, src=src_rank, group=group)
+
         dp_rank = torch.distributed.get_rank()
         dp_size = torch.distributed.get_world_size()  # not consider torch micro-dp
         tp_size = vllm_ps.get_tensor_model_parallel_world_size()

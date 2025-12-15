@@ -1,4 +1,5 @@
-vllm==0.8.2
-latex2sympy2 
+# vllm==0.8.2  # Commented out - will install latest version with CUDA 12.9 support
+latex2sympy2
 fire
 tensordict==0.7.2
+# Note: flash-attn not compatible with Blackwell architecture - do not install

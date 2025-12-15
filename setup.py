@@ -37,14 +37,14 @@ install_requires = [
   'tensordict<0.6',
   'torchdata',
   'transformers',
-  'vllm<=0.6.3',
+  # 'vllm<=0.6.3',  # Removed - will install manually for Blackwell compatibility
   'wandb',
 ]
 
 TEST_REQUIRES = ['pytest', 'yapf', 'py-spy']
 PRIME_REQUIRES = ['pyext']
 GEO_REQUIRES = ['mathruler']
-GPU_REQUIRES = ['liger-kernel', 'flash-attn']
+GPU_REQUIRES = ['liger-kernel']  # Removed flash-attn - not compatible with Blackwell architecture
 
 extras_require = {
   'test': TEST_REQUIRES,

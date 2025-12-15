@@ -31,7 +31,17 @@ from verl.utils.ulysses import ulysses_pad_and_slice_inputs, gather_outpus_and_u
 from verl.utils.seqlen_balancing import rearrange_micro_batches, get_reverse_idx
 import verl.utils.torch_functional as verl_F
 
-from flash_attn.bert_padding import pad_input, unpad_input, rearrange, index_first_axis
+# Optional flash_attn import for Blackwell GPU compatibility
+try:
+    from flash_attn.bert_padding import pad_input, unpad_input, rearrange, index_first_axis
+    FLASH_ATTN_AVAILABLE = True
+except ImportError:
+    FLASH_ATTN_AVAILABLE = False
+    # Fallback implementations when flash_attn is not available
+    pad_input = None
+    unpad_input = None
+    rearrange = None
+    index_first_axis = None
 
 __all__ = ['DataParallelPPOActor']
 
@@ -57,6 +67,15 @@ class DataParallelPPOActor(BasePPOActor):
         self.actor_module = actor_module
         self.actor_optimizer = actor_optimizer
         self.use_remove_padding = self.config.get('use_remove_padding', False)
+
+        # Check flash_attn availability for Blackwell GPU compatibility
+        if self.use_remove_padding and not FLASH_ATTN_AVAILABLE:
+            raise RuntimeError(
+                "use_remove_padding=True requires flash_attn, but it's not available. "
+                "Flash Attention is not compatible with Blackwell GPUs. "
+                "Please set actor_rollout_ref.model.use_remove_padding=False in your config."
+            )
+
         print(f'Actor use_remove_padding={self.use_remove_padding}')
         self.ulysses_sequence_parallel_size = self.config.ulysses_sequence_parallel_size
         self.use_ulysses_sp = self.ulysses_sequence_parallel_size > 1

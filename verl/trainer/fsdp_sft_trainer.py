@@ -35,7 +35,17 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, PreTrainedModel, A
 from verl.utils.torch_functional import get_cosine_schedule_with_warmup
 from tensordict import TensorDict
 from torch.utils.data import DataLoader, DistributedSampler
-from flash_attn.bert_padding import pad_input, unpad_input, rearrange, index_first_axis
+
+# Optional flash_attn import for Blackwell GPU compatibility
+try:
+    from flash_attn.bert_padding import pad_input, unpad_input, rearrange, index_first_axis
+    FLASH_ATTN_AVAILABLE = True
+except ImportError:
+    FLASH_ATTN_AVAILABLE = False
+    pad_input = None
+    unpad_input = None
+    rearrange = None
+    index_first_axis = None
 
 from verl.utils.fsdp_utils import get_fsdp_wrap_policy, init_fn, get_init_weight_context_manager
 from verl.utils.dataset import SFTDataset

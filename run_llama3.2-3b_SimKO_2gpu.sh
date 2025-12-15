@@ -34,7 +34,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.mix_topk_coef=0.01 \
     actor_rollout_ref.actor.optim.lr=$lr \
     actor_rollout_ref.actor.entropy_coeff=0 \
-    actor_rollout_ref.model.use_remove_padding=True \
+    actor_rollout_ref.model.use_remove_padding=False \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
     actor_rollout_ref.actor.ppo_max_token_len_per_gpu=12000 \

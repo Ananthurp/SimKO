@@ -320,6 +320,12 @@ def gpt2_dtensor_weight_loader(actor_weights: Dict, vllm_model: nn.Module) -> nn
 
 def redistribute_dtensor(param_name: str, loaded_weights: DTensor, parallelize_plan: Dict = None):
     param_name = _process_parameter_names(name=param_name)
+
+    # Handle case where loaded_weights is a regular Tensor (single GPU with world_size=1)
+    # In this case, FSDP returns full tensors, not DTensors
+    if not isinstance(loaded_weights, DTensor):
+        return loaded_weights
+
     if parallelize_plan is not None:
         assert (
             param_name

@@ -41,6 +41,13 @@ from verl.workers.sharding_manager.fsdp_ulysses import FSDPUlyssesShardingManage
 
 from codetiming import Timer
 
+# Check flash_attn availability for Blackwell GPU compatibility
+try:
+    import flash_attn
+    FLASH_ATTN_AVAILABLE = True
+except ImportError:
+    FLASH_ATTN_AVAILABLE = False
+
 logger = logging.getLogger(__file__)
 logger.setLevel(os.getenv('VERL_PPO_LOGGING_LEVEL', 'WARN'))
 
@@ -204,10 +211,15 @@ class ActorRolloutRefWorker(Worker):
             else:
                 actor_module_class = AutoModelForCausalLM
 
+            # Use eager attention if flash_attn is not available (Blackwell GPU compatibility)
+            attn_impl = 'flash_attention_2' if FLASH_ATTN_AVAILABLE else 'eager'
+            if not FLASH_ATTN_AVAILABLE:
+                logger.warning(f"flash_attn not available, using attn_implementation='{attn_impl}' instead")
+
             actor_module = actor_module_class.from_pretrained(pretrained_model_name_or_path=local_path,
                                                               torch_dtype=torch_dtype,
                                                               config=actor_model_config,
-                                                              attn_implementation='flash_attention_2',
+                                                              attn_implementation=attn_impl,
                                                               trust_remote_code=trust_remote_code)
             # Apply Liger kernel to the model if use_liger is set to True
             if use_liger:
@@ -711,10 +723,14 @@ class CriticWorker(Worker):
             warnings.simplefilter("ignore")
             setattr(critic_model_config, 'classifier_dropout', 0.)
             setattr(critic_model_config, 'hidden_dropout', '0')
+
+            # Use eager attention if flash_attn is not available (Blackwell GPU compatibility)
+            attn_impl = 'flash_attention_2' if FLASH_ATTN_AVAILABLE else 'eager'
+
             critic_module = AutoModelForTokenClassification.from_pretrained(pretrained_model_name_or_path=local_path,
                                                                             torch_dtype=torch_dtype,
                                                                             config=critic_model_config,
-                                                                            attn_implementation='flash_attention_2',
+                                                                            attn_implementation=attn_impl,
                                                                             trust_remote_code=trust_remote_code)
 
             # some parameters may not in torch_dtype
@@ -970,10 +986,14 @@ class RewardModelWorker(Worker):
         with init_context(), warnings.catch_warnings():
             warnings.simplefilter("ignore")
             setattr(model_config, 'classifier_dropout', 0.)
+
+            # Use eager attention if flash_attn is not available (Blackwell GPU compatibility)
+            attn_impl = 'flash_attention_2' if FLASH_ATTN_AVAILABLE else 'eager'
+
             reward_module = AutoModelForTokenClassification.from_pretrained(pretrained_model_name_or_path=local_path,
                                                                             config=model_config,
                                                                             torch_dtype=torch.bfloat16,
-                                                                            attn_implementation='flash_attention_2',
+                                                                            attn_implementation=attn_impl,
                                                                             trust_remote_code=trust_remote_code)
             reward_module.to(torch.bfloat16)
         auto_wrap_policy = get_fsdp_wrap_policy(module=reward_module, config=self.config.model.fsdp_config)

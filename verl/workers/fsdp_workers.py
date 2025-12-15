@@ -348,12 +348,20 @@ class ActorRolloutRefWorker(Worker):
             else:
                 raise NotImplementedError("vllm_mode must be 'customized' or 'spmd'")
             log_gpu_memory_usage('After building vllm rollout', logger=None)
+            # For older vLLM versions, use 'dummy_hf' for single GPU
+            # For newer vLLM (>= 0.7.0), use 'auto' or 'dtensor' format
             if torch.distributed.get_world_size() == 1:
-                self.config.rollout.load_format = 'dummy_hf'
+                from verl.third_party.vllm import vllm_version
+                if vllm_version in ('0.3.1', '0.4.2', '0.5.4', '0.6.3'):
+                    self.config.rollout.load_format = 'dummy_hf'
+                else:
+                    # For newer vLLM, use default (dtensor) format
+                    if not hasattr(self.config.rollout, 'load_format') or self.config.rollout.load_format is None:
+                        self.config.rollout.load_format = 'auto'
             rollout_sharding_manager = FSDPVLLMShardingManager(module=self.actor_module_fsdp,
                                                                inference_engine=rollout.inference_engine,
                                                                model_config=self.actor_model_config,
-                                                               full_params='hf' in self.config.rollout.load_format,
+                                                               full_params='hf' in self.config.rollout.load_format if hasattr(self.config.rollout, 'load_format') and self.config.rollout.load_format else False,
                                                                device_mesh=rollout_device_mesh)
             log_gpu_memory_usage('After building sharding manager', logger=None)
 

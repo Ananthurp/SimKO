@@ -22,9 +22,9 @@ python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_files="$train_files" \
     data.val_files="$test_files" \
-    data.train_batch_size=256 \
+    data.train_batch_size=128 \
     data.max_prompt_length=1024 \
-    data.max_response_length=2048 \
+    data.max_response_length=1536 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     actor_rollout_ref.model.path=$model_name \
@@ -37,10 +37,10 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.model.use_remove_padding=False \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
-    actor_rollout_ref.actor.ppo_max_token_len_per_gpu=6000 \
-    actor_rollout_ref.rollout.log_prob_max_token_len_per_gpu=6000 \
-    actor_rollout_ref.ref.log_prob_max_token_len_per_gpu=6000 \
-    actor_rollout_ref.actor.ppo_mini_batch_size=64 \
+    actor_rollout_ref.actor.ppo_max_token_len_per_gpu=4000 \
+    actor_rollout_ref.rollout.log_prob_max_token_len_per_gpu=4000 \
+    actor_rollout_ref.ref.log_prob_max_token_len_per_gpu=4000 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=32 \
     actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.fsdp_config.param_offload=True \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
@@ -67,12 +67,12 @@ python3 -m verl.trainer.main_ppo \
 # 1. CUDA_VISIBLE_DEVICES=0 - Use only GPU 0
 # 2. trainer.n_gpus_per_node=1 - Single GPU training
 # 3. rollout.tensor_model_parallel_size=1 - No tensor parallelism (single GPU)
-# 4. data.train_batch_size=256 - Reduced from 1024 (memory optimization)
-# 5. data.max_response_length=2048 - Reduced from 3072 (memory optimization)
-# 6. actor.ppo_mini_batch_size=64 - Reduced from 256 (memory optimization)
-# 7. actor.ppo_max_token_len_per_gpu=6000 - Reduced from 12000 (memory optimization)
-# 8. rollout.log_prob_max_token_len_per_gpu=6000 - Reduced from 12000 (memory optimization)
-# 9. ref.log_prob_max_token_len_per_gpu=6000 - Reduced from 12000 (memory optimization)
+# 4. data.train_batch_size=128 - Reduced from 1024 (aggressive memory optimization)
+# 5. data.max_response_length=1536 - Reduced from 3072 (aggressive memory optimization)
+# 6. actor.ppo_mini_batch_size=32 - Reduced from 256 (aggressive memory optimization)
+# 7. actor.ppo_max_token_len_per_gpu=4000 - Reduced from 12000 (aggressive memory optimization)
+# 8. rollout.log_prob_max_token_len_per_gpu=4000 - Reduced from 12000 (aggressive memory optimization)
+# 9. ref.log_prob_max_token_len_per_gpu=4000 - Reduced from 12000 (aggressive memory optimization)
 # 10. rollout.enforce_eager=True - CRITICAL: Disable flash attention (not compatible with Blackwell)
 # 11. rollout.gpu_memory_utilization=0.60 - Conservative vLLM memory allocation
 # 12. param_offload=True and optimizer_offload=True - Offload to CPU to save GPU memory
@@ -81,3 +81,7 @@ python3 -m verl.trainer.main_ppo \
 # Note: Single GPU setup uses sleep/wake mechanism where FSDP training sleeps
 # and releases GPU memory for vLLM inference, then wakes up for next training step.
 # This is slower than 2-GPU tensor parallel but uses less memory and is simpler.
+#
+# Memory footprint per batch: ~128 samples × 1536 tokens = 196K tokens
+# With Llama 3.2-3B (vocab ~128K), logits memory: 196K × 128K × 4 bytes ≈ 100 GB
+# SimKO requires computing top-K log probs which increases memory pressure significantly.

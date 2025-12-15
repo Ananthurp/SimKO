@@ -39,6 +39,7 @@ from torch.utils.data import DataLoader, DistributedSampler
 # Optional flash_attn import for Blackwell GPU compatibility
 try:
     from flash_attn.bert_padding import pad_input, unpad_input, rearrange, index_first_axis
+    import flash_attn
     FLASH_ATTN_AVAILABLE = True
 except ImportError:
     FLASH_ATTN_AVAILABLE = False
@@ -216,11 +217,16 @@ class FSDPSFTTrainer(object):
         # This may be very large
         init_context = get_init_weight_context_manager(use_meta_tensor=not config.tie_word_embeddings)
 
+        # Use eager attention if flash_attn is not available (Blackwell GPU compatibility)
+        attn_impl = 'flash_attention_2' if FLASH_ATTN_AVAILABLE else 'eager'
+        if not FLASH_ATTN_AVAILABLE:
+            logger.warning(f"flash_attn not available, using attn_implementation='{attn_impl}' instead")
+
         with init_context():
             self.model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(local_model_path,
                                                                                config=config,
                                                                                torch_dtype=torch.float32,
-                                                                               attn_implementation='flash_attention_2',
+                                                                               attn_implementation=attn_impl,
                                                                                trust_remote_code=trust_remote_code)
 
             # Apply Liger kernel if use_liger is enabled

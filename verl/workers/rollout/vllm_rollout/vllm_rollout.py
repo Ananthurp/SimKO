@@ -98,10 +98,10 @@ class vLLMRollout(BaseRollout):
             raise ValueError('Enable chunked prefill, max_num_batched_tokens is smaller than max_model_len, \
                              please increase max_num_batched_tokens or disable chunked prefill')
 
-        self.inference_engine = LLM(
-            actor_module,
+        # Build LLM initialization kwargs
+        llm_kwargs = dict(
+            model=actor_module,
             tokenizer=tokenizer,
-            model_hf_config=model_hf_config,
             tensor_parallel_size=tensor_parallel_size,
             dtype=config.dtype,
             enforce_eager=config.enforce_eager,
@@ -113,6 +113,13 @@ class vLLMRollout(BaseRollout):
             max_num_batched_tokens=max_num_batched_tokens,
             enable_chunked_prefill=config.enable_chunked_prefill,
         )
+
+        # Only pass model_hf_config for older vLLM versions (<= 0.6.3)
+        # Newer versions don't accept this parameter
+        if vllm_version in ('0.3.1', '0.4.2', '0.5.4', '0.6.3'):
+            llm_kwargs['model_hf_config'] = model_hf_config
+
+        self.inference_engine = LLM(**llm_kwargs)
 
         # Offload vllm model to reduce peak memory usage
         self.inference_engine.offload_model_weights()

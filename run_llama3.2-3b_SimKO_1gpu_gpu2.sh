@@ -6,7 +6,6 @@
 
 export RAY_DEDUP_LOGS=0
 export CUDA_VISIBLE_DEVICES=2
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 math_train_path=./data/gsm8k_level1/train.parquet
 math_test_path=./data/math/test.parquet

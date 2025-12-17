@@ -6,6 +6,7 @@
 
 export RAY_DEDUP_LOGS=0
 export CUDA_VISIBLE_DEVICES=0
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 math_train_path=./data/gsm8k_level1/train.parquet
 math_test_path=./data/math/test.parquet
@@ -22,9 +23,9 @@ python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_files="$train_files" \
     data.val_files="$test_files" \
-    data.train_batch_size=128 \
+    data.train_batch_size=64 \
     data.max_prompt_length=1024 \
-    data.max_response_length=1536 \
+    data.max_response_length=1024 \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     actor_rollout_ref.model.path=$model_name \
@@ -37,10 +38,10 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.model.use_remove_padding=False \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
-    actor_rollout_ref.actor.ppo_max_token_len_per_gpu=4000 \
-    actor_rollout_ref.rollout.log_prob_max_token_len_per_gpu=4000 \
-    actor_rollout_ref.ref.log_prob_max_token_len_per_gpu=4000 \
-    actor_rollout_ref.actor.ppo_mini_batch_size=32 \
+    actor_rollout_ref.actor.ppo_max_token_len_per_gpu=2000 \
+    actor_rollout_ref.rollout.log_prob_max_token_len_per_gpu=2000 \
+    actor_rollout_ref.ref.log_prob_max_token_len_per_gpu=2000 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=16 \
     actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.fsdp_config.param_offload=True \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \

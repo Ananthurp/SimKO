@@ -1,0 +1,60 @@
+export RAY_DEDUP_LOGS=0
+
+# --- CRITICAL CHANGE 1: Select only the free GPU ---
+export CUDA_VISIBLE_DEVICES=0 
+
+math_train_path=./data/gsm8k_level1/train.parquet
+math_test_path=./data/math/test.parquet
+aime2025_test_path=./data/aime2025/test.parquet
+amc23_test_path=./data/amc23/test.parquet
+
+train_files="['$math_train_path']"
+test_files="['$math_test_path', '$aime2025_test_path', '$amc23_test_path']"
+kl_coef=0
+lr=1e-6
+model_name=meta-llama/Llama-3.2-3B-Instruct
+
+python3 -m verl.trainer.main_ppo \
+    algorithm.adv_estimator=grpo \
+    data.train_files="$train_files" \
+    data.val_files="$test_files" \
+    data.train_batch_size=128 \
+    data.max_prompt_length=1024 \
+    data.max_response_length=3072 \
+    data.filter_overlong_prompts=True \
+    data.truncation='error' \
+    actor_rollout_ref.model.path=$model_name \
+    actor_rollout_ref.actor.simko=True \
+    actor_rollout_ref.actor.top_k=20 \
+    actor_rollout_ref.actor.tau=0.8 \
+    actor_rollout_ref.actor.mix_topk_coef=0.01 \
+    actor_rollout_ref.actor.optim.lr=$lr \
+    actor_rollout_ref.actor.entropy_coeff=0 \
+    actor_rollout_ref.model.use_remove_padding=True \
+    actor_rollout_ref.model.enable_gradient_checkpointing=True \
+    actor_rollout_ref.actor.use_dynamic_bsz=True \
+    actor_rollout_ref.actor.ppo_max_token_len_per_gpu=12000 \
+    actor_rollout_ref.rollout.log_prob_max_token_len_per_gpu=12000 \
+    actor_rollout_ref.ref.log_prob_max_token_len_per_gpu=12000 \
+    actor_rollout_ref.actor.ppo_mini_batch_size=128 \
+    actor_rollout_ref.actor.use_kl_loss=False \
+    actor_rollout_ref.actor.fsdp_config.param_offload=False \
+    actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
+    actor_rollout_ref.rollout.enforce_eager=False \
+    actor_rollout_ref.rollout.free_cache_engine=False \
+    actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
+    actor_rollout_ref.rollout.name=vllm \
+    actor_rollout_ref.rollout.gpu_memory_utilization=0.6 \
+    actor_rollout_ref.rollout.n=8 \
+    actor_rollout_ref.ref.fsdp_config.param_offload=False \
+    trainer.experiment_name="MATH-Llama-3.2-3B-GRPO-SingleGPU" \
+    algorithm.kl_ctrl.kl_coef=$kl_coef \
+    trainer.critic_warmup=0 \
+    trainer.logger=['wandb','console'] \
+    trainer.project_name='SimKO-TS2' \
+    trainer.n_gpus_per_node=1 \
+    +trainer.val_before_train=False \
+    trainer.nnodes=1 \
+    trainer.save_freq=8 \
+    trainer.test_freq=8 \
+    trainer.total_epochs=20 $@
